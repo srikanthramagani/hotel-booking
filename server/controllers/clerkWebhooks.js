@@ -23,7 +23,7 @@ const clerkWebhooks=async(req,res)=>{
         const userData={
             _id:data.id,
             email:data.email_addresses[0].email_address,
-            username: data.first_name +""+data.last_name,
+            username: data.first_name +" "+data.last_name,
             image: data.image_url,
 
         }
@@ -49,7 +49,7 @@ const clerkWebhooks=async(req,res)=>{
         res.json({success:true, message:"webhook Recieved"})
 
     }catch(error){
-        console.log(error.message());
+        console.log(error.message);
         res.json({success:false, message: error.message});
 
     }
