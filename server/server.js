@@ -1,25 +1,45 @@
-import express from 'express'
-import "dotenv/config";
-import cors from "cors";
-import connectDB from './configs/db.js';
-import { clerkMiddleware } from '@clerk/express'
-import clerkWebhooks from './controllers/clerkWebhooks.js';
+const clerkWebhooks = async (req, res) => {
+  try {
+    const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
-connectDB()
+    const headers = {
+      "svix-id": req.headers["svix-id"],
+      "svix-timestamp": req.headers["svix-timestamp"],
+      "svix-signature": req.headers["svix-signature"],
+    };
 
-const app=express()
-app.use(cors())
+    const payload = req.body.toString(); // must convert raw buffer to string
 
-//middleware
-app.use(express.json())
-app.use(clerkMiddleware())
+    const evt = whook.verify(payload, headers); // will throw if invalid
 
-//API to listen to Clerk Webhooks
+    const { data, type } = evt;
 
-app.post("/api/clerk",clerkWebhooks);
+    const userData = {
+      _id: data.id,
+      email: data.email_addresses[0].email_address,
+      username: `${data.first_name || ""} ${data.last_name || ""}`.trim(),
+      image: data.image_url,
+    };
 
-app.get('/',(req,res)=> res.send("API is working"))
+    switch (type) {
+      case "user.created":
+        await User.create(userData);
+        break;
+      case "user.updated":
+        await User.findByIdAndUpdate(data.id, userData);
+        break;
+      case "user.deleted":
+        await User.findByIdAndDelete(data.id);
+        break;
+      default:
+        break;
+    }
 
-const PORT=process.env.PORT || 3000;
+    res.status(200).json({ success: true, message: "Webhook processed" });
+  } catch (error) {
+    console.error("Webhook error:", error.message);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 
-app.listen(PORT,()=>console.log(`Server running on port ${PORT}`));
+export default clerkWebhooks;
